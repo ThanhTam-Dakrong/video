@@ -1,0 +1,14 @@
+{
+  "name": "video-chat-app",
+  "version": "1.0.0",
+  "description": "Video chat app using WebSocket",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.8.0"
+  },
+  "author": "",
+  "license": "ISC"
+}
