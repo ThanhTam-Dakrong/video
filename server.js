@@ -74,6 +74,22 @@ io.on('connection', socket => {
         socket.on('stop-share-screen', userId => {
             io.to(roomId).emit('stop-share-screen', userId);
         });
+
+        // Lắng nghe sự kiện "user-stream" từ client (video stream)
+        socket.on('user-stream', (streamData) => {
+            socket.to(roomId).emit('user-stream', streamData); // Phát video stream cho những người còn lại trong phòng
+        });
+
+        // Kết thúc cuộc gọi (khi người host nhấn nút end call)
+        socket.on('end-call', () => {
+            // Cập nhật status trong bảng rooms thành "closed"
+            // (Giả sử bạn có kết nối cơ sở dữ liệu để xử lý việc này)
+            console.log(`Kết thúc cuộc gọi trong phòng ${roomId}`);
+            // Giả sử bạn có một hàm `closeRoom` để cập nhật trạng thái trong DB
+            // closeRoom(roomId); // Cập nhật trạng thái phòng thành closed
+            io.to(roomId).emit('call-ended', { roomId }); // Thông báo cho tất cả người tham gia
+            socket.leave(roomId); // Người host rời khỏi phòng
+        });
     });
 });
 
