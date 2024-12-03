@@ -3,11 +3,16 @@ const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
 const cors = require('cors');  // Thêm thư viện CORS
+
+// Thêm middleware CORS
+
+
+
 // Tạo ứng dụng Express và server HTTP
 const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
-
+app.use(cors());
 // Lưu trữ thông tin phòng và người dùng
 const rooms = {}; // Lưu danh sách người dùng trong từng phòng
 const userStreams = {}; // Lưu trữ video stream của từng user
