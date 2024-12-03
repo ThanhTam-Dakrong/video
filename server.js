@@ -13,8 +13,9 @@ const io = socketIO(server);
 // Cung cấp tài nguyên tĩnh từ thư mục "public"
 app.use(express.static('public'));
 
-// Lưu trữ thông tin phòng
-const rooms = {};
+// Lưu trữ thông tin phòng và video stream
+const rooms = {}; // Lưu danh sách người tham gia mỗi phòng
+const userStreams = {}; // Lưu stream của từng user theo userId
 
 // Lắng nghe sự kiện "connection" từ Socket.IO
 io.on('connection', socket => {
@@ -35,13 +36,26 @@ io.on('connection', socket => {
         // Thông báo cho các client khác trong phòng về người mới tham gia
         socket.to(roomId).emit('user-connected', { userId, username });
 
-        // Gửi danh sách người dùng trong phòng cho người dùng mới tham gia
+        // Gửi danh sách người dùng trong phòng cho người mới tham gia
         socket.emit('update-users', rooms[roomId]);
+
+        // Lắng nghe sự kiện "user-stream" từ client (video stream)
+        socket.on('user-stream', (streamData) => {
+            // Lưu lại stream của user
+            userStreams[userId] = streamData;
+
+            // Phát stream của user mới cho tất cả mọi người trong phòng
+            socket.to(roomId).emit('user-stream', { userId, streamData });
+        });
 
         // Lắng nghe sự kiện "disconnect"
         socket.on('disconnect', () => {
+            // Xóa user khỏi phòng và luồng video
             rooms[roomId] = rooms[roomId].filter(user => user.userId !== userId);
+            delete userStreams[userId];
             console.log(`${username} đã rời phòng ${roomId}`);
+
+            // Thông báo cho những người còn lại trong phòng
             socket.to(roomId).emit('user-disconnected', { userId, username });
         });
 
@@ -75,18 +89,9 @@ io.on('connection', socket => {
             io.to(roomId).emit('stop-share-screen', userId);
         });
 
-        // Lắng nghe sự kiện "user-stream" từ client (video stream)
-        socket.on('user-stream', (streamData) => {
-            socket.to(roomId).emit('user-stream', streamData); // Phát video stream cho những người còn lại trong phòng
-        });
-
         // Kết thúc cuộc gọi (khi người host nhấn nút end call)
         socket.on('end-call', () => {
-            // Cập nhật status trong bảng rooms thành "closed"
-            // (Giả sử bạn có kết nối cơ sở dữ liệu để xử lý việc này)
             console.log(`Kết thúc cuộc gọi trong phòng ${roomId}`);
-            // Giả sử bạn có một hàm `closeRoom` để cập nhật trạng thái trong DB
-            // closeRoom(roomId); // Cập nhật trạng thái phòng thành closed
             io.to(roomId).emit('call-ended', { roomId }); // Thông báo cho tất cả người tham gia
             socket.leave(roomId); // Người host rời khỏi phòng
         });
