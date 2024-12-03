@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Call with Agora</title>
+    <title>Agora Video Call</title>
     <style>
         body {
             background-color: black;
             color: white;
             font-family: Arial, sans-serif;
+            text-align: center;
         }
         #videoContainer {
             display: flex;
@@ -22,11 +23,24 @@
             border: 2px solid white;
             border-radius: 8px;
         }
+        button {
+            margin: 20px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
     </style>
 </head>
 <body>
-    <h1 style="text-align: center;">Agora Video Call</h1>
+    <h1>Agora Video Call</h1>
     <div id="videoContainer"></div>
+    <button onclick="startCall()">Start Video Call</button>
 
     <!-- Agora SDK -->
     <script src="https://cdn.agora.io/sdk/web/AgoraRTCSDK-4.0.0.js"></script>
@@ -50,27 +64,35 @@
                 client.join(TOKEN, CHANNEL, null, (uid) => {
                     console.log("User " + uid + " joined the channel");
 
-                    // Lấy stream của người dùng địa phương
-                    localStream = AgoraRTC.createStream({
-                        streamID: uid,
-                        audio: true,
-                        video: true,
-                        screen: false
-                    });
+                    // Yêu cầu quyền truy cập vào camera và microphone
+                    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                        .then((stream) => {
+                            localStream = AgoraRTC.createStream({
+                                streamID: uid,
+                                audio: true,
+                                video: true,
+                                screen: false
+                            });
 
-                    localStream.init(() => {
-                        console.log("Local stream initialized");
+                            // Kết nối và phát stream địa phương
+                            localStream.init(() => {
+                                console.log("Local stream initialized");
 
-                        // Hiển thị video địa phương
-                        localStream.play('local-video');
+                                // Hiển thị video địa phương
+                                localStream.play('local-video');
 
-                        // Publish stream lên kênh
-                        client.publish(localStream, (err) => {
-                            console.log("Publish local stream error: " + err);
+                                // Publish stream lên kênh
+                                client.publish(localStream, (err) => {
+                                    console.log("Publish local stream error: " + err);
+                                });
+                            }, (err) => {
+                                console.error("Local stream initialization error: ", err);
+                            });
+                        })
+                        .catch((err) => {
+                            alert("Permission for camera and microphone is required.");
+                            console.error("Permission error: ", err);
                         });
-                    }, (err) => {
-                        console.error("Local stream initialization error: ", err);
-                    });
                 });
             }, (err) => {
                 console.error("AgoraRTC client init failed", err);
@@ -113,8 +135,10 @@
             });
         }
 
-        // Bắt đầu ứng dụng khi tải trang
-        window.onload = initAgora;
+        // Bắt đầu video call
+        function startCall() {
+            initAgora();
+        }
     </script>
 </body>
 </html>
