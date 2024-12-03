@@ -1,4 +1,4 @@
-const socket = io("https://video-4-n5r2.onrender.com"); // Kết nối đến Signaling Server
+const socket = io("https://video-3-8shi.onrender.com"); // Kết nối đến Signaling Server
 const videoGrid = document.getElementById("videoGrid");
 let localStream;
 const peers = {};
