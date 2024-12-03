@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Call with Agora</title>
+    <style>
+        body {
+            background-color: black;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #videoContainer {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        video {
+            width: 300px;
+            height: 200px;
+            margin: 10px;
+            border: 2px solid white;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center;">Agora Video Call</h1>
+    <div id="videoContainer"></div>
+
+    <!-- Agora SDK -->
+    <script src="https://cdn.agora.io/sdk/web/AgoraRTCSDK-4.0.0.js"></script>
+    <script>
+        const APP_ID = 'ThanhTam'; // Thay thế bằng App ID của bạn
+        const CHANNEL = 'test'; // Tên phòng video call
+        const TOKEN = 'ACoca458af319a949aaa91a89720b055e8c'; // Nếu cần, bạn có thể sử dụng token trong Agora
+
+        let client;
+        let localStream;
+        let remoteStreams = [];
+
+        // Khởi tạo Agora client
+        function initAgora() {
+            client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+
+            client.init(APP_ID, () => {
+                console.log("AgoraRTC client initialized");
+
+                // Tham gia kênh
+                client.join(TOKEN, CHANNEL, null, (uid) => {
+                    console.log("User " + uid + " joined the channel");
+
+                    // Lấy stream của người dùng địa phương
+                    localStream = AgoraRTC.createStream({
+                        streamID: uid,
+                        audio: true,
+                        video: true,
+                        screen: false
+                    });
+
+                    localStream.init(() => {
+                        console.log("Local stream initialized");
+
+                        // Hiển thị video địa phương
+                        localStream.play('local-video');
+
+                        // Publish stream lên kênh
+                        client.publish(localStream, (err) => {
+                            console.log("Publish local stream error: " + err);
+                        });
+                    }, (err) => {
+                        console.error("Local stream initialization error: ", err);
+                    });
+                });
+            }, (err) => {
+                console.error("AgoraRTC client init failed", err);
+            });
+
+            client.on('stream-added', (evt) => {
+                const remoteStream = evt.stream;
+                const streamId = remoteStream.getId();
+
+                // Thêm video của người tham gia mới
+                client.subscribe(remoteStream, (err) => {
+                    console.log("Subscribe remote stream failed: ", err);
+                });
+
+                console.log("New stream added: " + streamId);
+            });
+
+            client.on('stream-subscribed', (evt) => {
+                const remoteStream = evt.stream;
+                const streamId = remoteStream.getId();
+
+                // Hiển thị video của người tham gia
+                const videoElement = document.createElement('video');
+                videoElement.id = 'video_' + streamId;
+                document.getElementById('videoContainer').appendChild(videoElement);
+
+                remoteStream.play(videoElement.id);
+                remoteStreams.push(remoteStream);
+            });
+
+            client.on('stream-removed', (evt) => {
+                const remoteStream = evt.stream;
+                const streamId = remoteStream.getId();
+
+                // Xóa video khi người tham gia rời đi
+                document.getElementById('video_' + streamId).remove();
+                remoteStreams = remoteStreams.filter((stream) => stream.getId() !== streamId);
+
+                console.log("Stream removed: " + streamId);
+            });
+        }
+
+        // Bắt đầu ứng dụng khi tải trang
+        window.onload = initAgora;
+    </script>
+</body>
+</html>
