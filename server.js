@@ -2,7 +2,7 @@
 const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
-
+const cors = require('cors');  // Thêm thư viện CORS
 // Tạo ứng dụng Express và server HTTP
 const app = express();
 const server = http.createServer(app);
