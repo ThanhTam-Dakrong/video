@@ -1,73 +1,90 @@
+const socket = io("https://video-4-n5r2.onrender.com"); // Kết nối đến Signaling Server
+const videoGrid = document.getElementById("videoGrid");
 let localStream;
-let remoteStream;
-let peerConnection;
+const peers = {};
 
-// STUN server (dùng để vượt NAT/firewall)
-const configuration = {
-  iceServers: [
-    {
-      urls: "stun:stun.l.google.com:19302"
-    }
-  ]
-};
+// Hiển thị video
+function addVideoStream(video, stream) {
+  video.srcObject = stream;
+  video.addEventListener("loadedmetadata", () => {
+    video.play();
+  });
+  videoGrid.appendChild(video);
+}
 
-// Chọn các phần tử video
-const localVideo = document.getElementById("localVideo");
-const remoteVideo = document.getElementById("remoteVideo");
-
-// Start Call
+// Khi nhấn nút Start Call
 document.getElementById("startCall").addEventListener("click", async () => {
-  // Lấy luồng video từ camera
   localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-  localVideo.srcObject = localStream;
 
-  // Khởi tạo kết nối ngang hàng (PeerConnection)
-  peerConnection = new RTCPeerConnection(configuration);
+  // Hiển thị video của chính bạn
+  const localVideo = document.createElement("video");
+  localVideo.muted = true;
+  addVideoStream(localVideo, localStream);
 
-  // Thêm luồng địa phương vào PeerConnection
-  localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+  socket.emit("join-call", "room-1");
 
-  // Nhận luồng từ phía đối diện
-  peerConnection.ontrack = event => {
-    remoteStream = event.streams[0];
-    remoteVideo.srcObject = remoteStream;
+  // Khi có người mới tham gia
+  socket.on("user-connected", (userId) => {
+    console.log("User connected:", userId);
+    connectToNewUser(userId, localStream);
+  });
+
+  // Khi nhận được tín hiệu WebRTC
+  socket.on("signal", async (data) => {
+    const peerConnection = peers[data.from];
+    if (!peerConnection) return;
+
+    if (data.type === "offer") {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+      socket.emit("signal", { to: data.from, type: "answer", answer });
+    } else if (data.type === "answer") {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+    } else if (data.type === "candidate") {
+      await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+    }
+  });
+
+  // Khi có người ngắt kết nối
+  socket.on("user-disconnected", (userId) => {
+    if (peers[userId]) {
+      peers[userId].close();
+      delete peers[userId];
+    }
+  });
+});
+
+// Kết nối tới người dùng mới
+function connectToNewUser(userId, stream) {
+  const peerConnection = new RTCPeerConnection({
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+  });
+
+  stream.getTracks().forEach((track) => peerConnection.addTrack(track, stream));
+
+  peerConnection.ontrack = (event) => {
+    const remoteVideo = document.createElement("video");
+    addVideoStream(remoteVideo, event.streams[0]);
   };
 
-  // Đàm phán ICE candidate
-  peerConnection.onicecandidate = event => {
+  peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
-      console.log("Send ICE Candidate to Remote Peer:", event.candidate);
-      // Gửi ICE candidate tới peer khác thông qua server signaling
+      socket.emit("signal", { to: userId, type: "candidate", candidate: event.candidate });
     }
   };
 
-  // Tạo SDP offer
-  const offer = await peerConnection.createOffer();
-  await peerConnection.setLocalDescription(offer);
+  peers[userId] = peerConnection;
 
-  console.log("Send Offer to Remote Peer:", offer);
-  // Gửi offer tới peer khác thông qua server signaling
-});
+  peerConnection.createOffer().then((offer) => {
+    peerConnection.setLocalDescription(offer);
+    socket.emit("signal", { to: userId, type: "offer", offer });
+  });
+}
 
-// End Call
+// Khi nhấn nút End Call
 document.getElementById("endCall").addEventListener("click", () => {
-  if (peerConnection) {
-    peerConnection.close();
-    peerConnection = null;
-  }
-});
-
-// Share Screen
-document.getElementById("shareScreen").addEventListener("click", async () => {
-  const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-  const screenTrack = screenStream.getTracks()[0];
-
-  // Thay track video bằng track màn hình
-  const sender = peerConnection.getSenders().find(s => s.track.kind === "video");
-  sender.replaceTrack(screenTrack);
-
-  // Trả lại camera sau khi chia sẻ màn hình xong
-  screenTrack.onended = () => {
-    sender.replaceTrack(localStream.getVideoTracks()[0]);
-  };
+  Object.values(peers).forEach((peer) => peer.close());
+  peers = {};
+  socket.disconnect();
 });
