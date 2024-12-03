@@ -3,143 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agora Video Call</title>
+    <title>Video Call App</title>
     <style>
-        body {
-            background-color: black;
-            color: white;
-            font-family: Arial, sans-serif;
-            text-align: center;
-        }
-        #videoContainer {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        video {
-            width: 300px;
-            height: 200px;
-            margin: 10px;
-            border: 2px solid white;
-            border-radius: 8px;
-        }
-        button {
-            margin: 20px;
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; text-align: center; }
+        #video-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 20px; }
+        video { width: 300px; border: 2px solid #ccc; border-radius: 8px; }
+        button { padding: 10px 20px; margin: 10px; }
     </style>
 </head>
 <body>
-    <h1>Agora Video Call</h1>
-    <div id="videoContainer"></div>
-    <button onclick="startCall()">Start Video Call</button>
+    <h1>Welcome to Video Call App</h1>
+    <div id="controls">
+        <button onclick="endCall()">End Call</button>
+    </div>
+    <div id="video-grid"></div>
 
-    <!-- Tải Agora SDK -->
-    <script src="https://cdn.agora.io/sdk/web/AgoraRTCSDK-4.0.0.js"></script>
-
-    <!-- Chạy các đoạn script sau khi Agora SDK tải xong -->
+    <script src="/socket.io/socket.io.js"></script>
     <script>
-        const APP_ID = 'ThanhTam'; // Thay thế bằng App ID của bạn
-        const CHANNEL = 'test'; // Tên phòng video call
-        const TOKEN = 'ACoca458af319a949aaa91a89720b055e8c'; // Nếu cần, bạn có thể sử dụng token trong Agora
+        const socket = io();
+        const videoGrid = document.getElementById('video-grid');
+        const roomId = 'default-room'; // You can change this to dynamically generate room IDs
+        const userId = socket.id;
+        const username = prompt("Enter your name:");
+        const myVideo = document.createElement('video');
+        myVideo.muted = true;
+        const myStream = null;
 
-        let client;
-        let localStream;
-        let remoteStreams = [];
+        // Tham gia phòng
+        socket.emit('join-room', roomId, userId, username);
 
-        // Khởi tạo Agora client
-        function initAgora() {
-            client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+        // Nhận danh sách người dùng
+        socket.on('update-users', users => {
+            console.log('Users in room:', users);
+        });
 
-            client.init(APP_ID, () => {
-                console.log("AgoraRTC client initialized");
+        // Khi có người dùng kết nối
+        socket.on('user-connected', data => {
+            console.log('User connected:', data);
+            // Thêm video cho người dùng mới
+            createVideoElement(data.userId);
+        });
 
-                // Tham gia kênh
-                client.join(TOKEN, CHANNEL, null, (uid) => {
-                    console.log("User " + uid + " joined the channel");
+        // Khi người dùng rời phòng
+        socket.on('user-disconnected', data => {
+            console.log('User disconnected:', data);
+            const video = document.getElementById(data.userId);
+            if (video) video.remove();
+        });
 
-                    // Yêu cầu quyền truy cập vào camera và microphone
-                    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-                        .then((stream) => {
-                            localStream = AgoraRTC.createStream({
-                                streamID: uid,
-                                audio: true,
-                                video: true,
-                                screen: false
-                            });
+        // Tạo video element cho người dùng
+        function createVideoElement(userId) {
+            const video = document.createElement('video');
+            video.id = userId;
+            video.autoplay = true;
+            video.playsInline = true;
+            videoGrid.appendChild(video);
 
-                            // Kết nối và phát stream địa phương
-                            localStream.init(() => {
-                                console.log("Local stream initialized");
+            // Sử dụng WebRTC để lấy video stream từ người dùng
+            navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                .then(stream => {
+                    video.srcObject = stream;
 
-                                // Hiển thị video địa phương
-                                localStream.play('local-video');
+                    // Gửi stream của người dùng tới tất cả mọi người trong phòng
+                    socket.emit('user-stream', { userId, stream });
 
-                                // Publish stream lên kênh
-                                client.publish(localStream, (err) => {
-                                    console.log("Publish local stream error: " + err);
-                                });
-                            }, (err) => {
-                                console.error("Local stream initialization error: ", err);
-                            });
-                        })
-                        .catch((err) => {
-                            alert("Permission for camera and microphone is required.");
-                            console.error("Permission error: ", err);
-                        });
+                    // Khi người dùng tham gia, phát stream cho tất cả
+                    socket.on('user-stream', data => {
+                        const stream = new MediaStream();
+                        const videoElement = document.getElementById(data.userId);
+                        videoElement.srcObject = data.streamData;
+                    });
+                })
+                .catch(err => {
+                    console.error('Error accessing media devices.', err);
                 });
-            }, (err) => {
-                console.error("AgoraRTC client init failed", err);
-            });
-
-            client.on('stream-added', (evt) => {
-                const remoteStream = evt.stream;
-                const streamId = remoteStream.getId();
-
-                // Thêm video của người tham gia mới
-                client.subscribe(remoteStream, (err) => {
-                    console.log("Subscribe remote stream failed: ", err);
-                });
-
-                console.log("New stream added: " + streamId);
-            });
-
-            client.on('stream-subscribed', (evt) => {
-                const remoteStream = evt.stream;
-                const streamId = remoteStream.getId();
-
-                // Hiển thị video của người tham gia
-                const videoElement = document.createElement('video');
-                videoElement.id = 'video_' + streamId;
-                document.getElementById('videoContainer').appendChild(videoElement);
-
-                remoteStream.play(videoElement.id);
-                remoteStreams.push(remoteStream);
-            });
-
-            client.on('stream-removed', (evt) => {
-                const remoteStream = evt.stream;
-                const streamId = remoteStream.getId();
-
-                // Xóa video khi người tham gia rời đi
-                document.getElementById('video_' + streamId).remove();
-                remoteStreams = remoteStreams.filter((stream) => stream.getId() !== streamId);
-
-                console.log("Stream removed: " + streamId);
-            });
         }
 
-        // Bắt đầu video call
-        function startCall() {
-            initAgora();
+        // Kết thúc cuộc gọi
+        function endCall() {
+            socket.emit('end-call', roomId);
         }
     </script>
 </body>
