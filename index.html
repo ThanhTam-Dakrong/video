@@ -3,11 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Video Call App</title>
+  <title>Group Video Call</title>
   <style>
+    #videoGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+    }
     video {
-      width: 45%;
-      margin: 5px;
+      width: 100%;
       border: 2px solid #000;
     }
     #controls {
@@ -16,16 +20,13 @@
   </style>
 </head>
 <body>
-  <h1>Video Call App</h1>
-  <div>
-    <video id="localVideo" autoplay muted></video>
-    <video id="remoteVideo" autoplay></video>
-  </div>
+  <h1>Group Video Call</h1>
+  <div id="videoGrid"></div>
   <div id="controls">
     <button id="startCall">Start Call</button>
     <button id="endCall">End Call</button>
-    <button id="shareScreen">Share Screen</button>
   </div>
+  <script src="/socket.io/socket.io.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
