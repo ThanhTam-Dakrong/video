@@ -1,4 +1,4 @@
-const socket = io("https://thanhtam-dakrong.github.io/video/server.js"); // Kết nối đến Signaling Server
+const socket = io("https://afbdc00e-2945-4070-946c-3e7e6edfed37-00-3q1w6r027yzw4.sisko.replit.dev/"); // Kết nối đến Signaling Server
 const videoGrid = document.getElementById("videoGrid");
 let localStream;
 const peers = {};
