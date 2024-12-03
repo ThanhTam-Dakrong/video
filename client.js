@@ -1,5 +1,5 @@
 // Kết nối với server
-const socket = io('https://<SERVER_URL>'); // Thay <SERVER_URL> bằng URL server của bạn (Render hoặc localhost)
+const socket = io('https://video-3-8shi.onrender.com'); // Thay <SERVER_URL> bằng URL server của bạn (Render hoặc localhost)
 
 // Lấy các phần tử DOM
 const videoGrid = document.getElementById('videoGrid');
